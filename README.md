@@ -48,7 +48,7 @@ the top-level ACES repository.
 
 ## Reporting Issues
 
-To report a problem with Look Transfoms, please open an
+To report a problem with Look Transforms, please open an
 [issue](https://github.com/ampas/aces-look/issues).
 
 If the issue is senstive in nature or a security related issue, please do not
