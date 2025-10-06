@@ -3,7 +3,8 @@
 
 # ACES Look Transforms
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![CLA
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![CLA
 assistant](https://cla-assistant.io/readme/badge/ampas/aces-look)](https://cla-assistant.io/ampas/aces-look)
 
 ACES Look Transforms, or Look Modification Transforms (LMTs), provide a
@@ -41,10 +42,12 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
 
 ## Governance
 
-This repository is a submodule of the ACES project, hosted by the ASWF. Details
-about how the project operates can be found in the
-[GOVERNANCE.md](https://github.com/ampas/aces/blob/main/GOVERNANCE.md) file in
-the top-level ACES repository.
+This repository is a submodule of the ACES project, which is governed by the
+Academy Software Foundation.
+
+For details about how the project operates, refer to the
+[GOVERNANCE.md](https://github.com/ampas/aces/blob/main/GOVERNANCE.md) file
+found in in the top-level ACES repository.
 
 ## Reporting Issues
 
