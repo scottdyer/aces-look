@@ -8,7 +8,7 @@
 assistant](https://cla-assistant.io/readme/badge/ampas/aces-look)](https://cla-assistant.io/ampas/aces-look)
 
 ACES Look Transforms, or Look Modification Transforms (LMTs), provide a
-mechasnism for applying creative or stylistic adjustments to ACES images. A Look
+mechanism for applying creative or stylistic adjustments to ACES images. A Look
 Transform modifies the default appearance produced by an Output Transform,
 enabling customized looks that can be reused as alterative starting points on
 ACES projects.
@@ -18,16 +18,28 @@ encodings may be used internally when specific color operations require it. In
 the process diagram, the output of an LMT is referred to as ACES' ("ACES
 prime"), which is subsequently processed Output Transform.  
 
-                |---------|            |---------|
-                |         |            |         |
-      ACES ---->|  Look   |--- ACES'-->| Output  |--->   display 
-                |Transform|            |Transform|     code values
-                |         |            |         |
-                |---------|            |---------|
+``` mermaid
+flowchart LR
+    A["ACES"]
+    B["Look
+    Transform"]
+    C["ACES'"]
+    D["Output
+    Transform"]
+    E["Display
+    Code Values"]
 
+    A --> B --> C --> D --> E
+
+    %% Define class with no border
+    classDef noBorder stroke:none,stroke-width:0px,fill:none;
+    
+    %% Apply class
+    class A,C,E noBorder;
+```
 
 More information about designing and using Look Transforms can be found in the
-[ACES Documentation](docs.acescentral.com).
+[ACES Documentation](https://docs.acescentral.com/).
 
 ## Contributing
 
@@ -46,13 +58,13 @@ This repository is a submodule of the ACES project, which is governed by the
 Academy Software Foundation.
 
 For details about how the project operates, refer to the
-[GOVERNANCE.md](https://github.com/ampas/aces/blob/main/GOVERNANCE.md) file
+[GOVERNANCE.md](https://github.com/aces-aswf/aces/blob/main/GOVERNANCE.md) file
 found in in the top-level ACES repository.
 
 ## Reporting Issues
 
 To report a problem with Look Transforms, please open an
-[issue](https://github.com/ampas/aces-look/issues).
+[issue](https://github.com/aces-aswf/aces-look/issues).
 
 If the issue is senstive in nature or a security related issue, please do not
 report in the issue tracker. Instead refer to [SECURITY.md](SECURITY.md) for
