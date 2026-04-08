@@ -1,9 +1,8 @@
 // --- UI CONSTANTS ---
-DEFINE_UI_PARAMS(j_mode, J Adjustment, DCTLUI_COMBO_BOX, 0, {MODE_J_SPLINE, MODE_J_LUT}, {B-Spline, 1D LUT})
-DEFINE_UI_PARAMS(m_mode, M Adjustment, DCTLUI_COMBO_BOX, 0, {MODE_M_SPLINE, MODE_M_COSINE, MODE_M_CONSTANT, MODE_M_NONE}, {M-Spline, Cosine Shaper, Constant Gain, No Gain})
-// DEFINE_UI_PARAMS(show_J_overlay, Show J Curve Overlay, DCTLUI_CHECK_BOX, 0)
-DEFINE_UI_PARAMS(show_M_overlay, Show M Curve Overlay, DCTLUI_CHECK_BOX, 0)
-DEFINE_UI_PARAMS(overlay_location, Overlay location, DCTLUI_COMBO_BOX, 0, {OL_FULL, OL_TL, OL_TR, OL_BL, OL_BR}, {Full frame, Top Left, Top Right, Bottom Left, Bottom Right})
+DEFINE_UI_PARAMS(j_mode, J Curve Type, DCTLUI_COMBO_BOX, 0, {MODE_J_SPLINE, MODE_J_LUT}, {B-Spline, 1D LUT})
+DEFINE_UI_PARAMS(m_mode, M Curve Type, DCTLUI_COMBO_BOX, 0, {MODE_M_SPLINE, MODE_M_COSINE, MODE_M_CONSTANT, MODE_M_NONE}, {M-Spline, Cosine Shaper, Constant Gain, No Gain})
+DEFINE_UI_PARAMS(show_M_overlay, Show M Curve as Overlay, DCTLUI_CHECK_BOX, 0)
+DEFINE_UI_PARAMS(overlay_location, Graph overlay location, DCTLUI_COMBO_BOX, 0, {OL_FULL, OL_TL, OL_TR, OL_BL, OL_BR}, {Full frame, Top Left, Top Right, Bottom Left, Bottom Right})
 
 // Define values that control end-points of cosine shaper curve
 DEFINE_UI_PARAMS(x_lower, Cosine: x_min, DCTLUI_SLIDER_FLOAT, 0.05, 0.0, 1.0, 0.01)
