@@ -1,7 +1,7 @@
 // --- UI CONSTANTS ---
 DEFINE_UI_PARAMS(primaries, Primaries, DCTLUI_COMBO_BOX, 0, {PRIMARIES_AP1, PRIMARIES_AP0}, {AP1, AP0})
-DEFINE_UI_PARAMS(curve_mode, Curve Type, DCTLUI_COMBO_BOX, 1, {MODE_SPLINE, MODE_CTL_LUT, MODE_CTL_HIGHLIGHT_LUT}, {B-Spline from OCIO Config, 1D LUT from CTL (full v1 match), 1D LUT from CTL (highlights only)})
-DEFINE_UI_PARAMS(extrapolation_type, Extrapolation type, DCTLUI_COMBO_BOX, 1, {NONE, LINEAR}, {None, Linear})
+DEFINE_UI_PARAMS(curve_mode, Curve Type, DCTLUI_COMBO_BOX, 0, {MODE_SPLINE, MODE_CTL_LUT, MODE_CTL_HIGHLIGHT_LUT}, {B-Spline from OCIO Config, 1D LUT from CTL (full v1 match), 1D LUT from CTL (highlights only)})
+DEFINE_UI_PARAMS(extrapolation_type, Extrap. type, DCTLUI_COMBO_BOX, 1, {NONE, LINEAR}, {None, Linear})
 DEFINE_UI_PARAMS(sat, Saturation, DCTLUI_SLIDER_FLOAT, 1.0, 0.0, 2.0, 1.0)
 
 DEFINE_UI_TOOLTIP(Extrapolation type, "Only applies to LUT curve type")
@@ -19,7 +19,9 @@ __CONSTANT__ int CTL_HIGHLIGHT_LUT_SIZE = 256;
 
 
 __DEVICE__ float lin_to_stops( float lin) {
-    return _log2f(lin)-_log2f(0.18f);
+    // clamp to 2^-15 to avoid log(0) or negaative
+    float safe_lin = _fmaxf(lin, 0.000030517578125f);
+    return _log2f(safe_lin)-_log2f(0.18f);
 }
 
 __DEVICE__ float stops_to_lin( float stops) {
