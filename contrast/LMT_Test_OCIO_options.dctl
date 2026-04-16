@@ -1,0 +1,198 @@
+// --- UI CONSTANTS ---
+DEFINE_UI_PARAMS(lmt_option, LMT type, DCTLUI_COMBO_BOX, 0, {AP1_CURVE, J_CURVE, JM_GAIN, JM_CURVE}, {AP1 Curve, J curve, J curve + M gain, J curve + M curve})
+
+
+// --- DATA TABLES ---
+// For AP1 Curve
+__CONSTANT__ float c_knots[10] = {-7.0f, -0.5, 0.0f, 0.5f, 1.5f, 2.5f, 3.5f, 4.5f, 5.5f, 6.5f };
+__CONSTANT__ float c_coefs[27] = {0.0f, 0.202353f, 0.185843f, -0.015967f, -0.055061f, -0.045387f, 0.061362f, 0.298035f, 0.238634f, 1.0f, 1.0f, 1.202353f, 1.388196f, 1.356262f, 1.246140f, 1.155366f, 1.278090f, 1.874159f, -7.0f, -0.5f, 0.0f, 0.702353f, 2.074039f, 3.414876f, 4.566319f, 5.725608f, 7.122499f };
+
+// For J curve
+__CONSTANT__ float j_knots[18] = {0.01125021f, 0.0954447091f, 0.103895605f, 0.1123465f, 0.115773916f, 0.132191107f, 0.169800162f, 0.182763204f, 0.217429608f, 0.252095997f, 0.299382627f, 0.346669286f, 0.463203728f, 0.474818707f, 0.629563391f, 0.64696902f, 0.723198712f, 0.875658214f};
+__CONSTANT__ float j_coefs[51] = {0.0f, -2.63160825f, 7.89482498f, 53.0212593f, 2.31092477f, 0.377268374f, 3.17556596f, 1.77993941f, -2.08326435f, -1.16943979f, 0.953555107f, 0.122761041f, 12.3576288f, 0.56906271f, 44.979126f, 4.07724142f, 1.01930916f, 1.0f, 1.0f, 0.955521107f, 1.08895779f, 1.45240963f, 1.52828741f, 1.55666482f, 1.63899481f, 1.76240301f, 1.61796451f, 1.50736678f, 1.59754765f, 1.62615943f, 1.9132266f, 2.08934546f, 3.65512538f, 4.27673912f, 0.01125021f, 0.0954447091f, 0.103707664f, 0.1123465f, 0.116701663f, 0.141168997f, 0.199180067f, 0.2198928f, 0.27884993f, 0.337442487f, 0.411335677f, 0.484746188f, 0.672582626f, 0.693137586f, 1.00282598f, 1.05281901f, 1.35514081f};
+
+// For M curve
+__CONSTANT__ float m_knots[9] = {0.0f, 0.0500000007f, 0.0783967525f, 0.150000006f, 0.369947463f, 0.550000012f, 0.682201087f, 0.75f, 1.0f};
+__CONSTANT__ float m_coefs[24] = {0.0f, 20.369606f, 1.31447661f, 2.49535179f, -3.7139051f, -0.968503118f, -6.26355982f, 0.0f, 0.0f, 0.0f, 1.15686131f, 1.34510291f, 2.44279552f, 1.10539937f, 0.849325061f, 0.0f, 1.0f, 1.0f, 1.01642561f, 1.10599995f, 1.52256918f, 1.84200001f, 1.97120833f, 2.0f};
+
+__CONSTANT__ float const_gain = 1.22f;
+
+// --- Linear <--> STOPS CONVERSIONS ---
+__DEVICE__ float lin_to_stops( float lin) {
+    // clamp to 2^-15 to avoid log(0) or negaative
+    float safe_lin = _fmaxf(lin, 0.000030517578125f);
+    return _log2f(safe_lin)-_log2f(0.18f);
+}
+
+__DEVICE__ float stops_to_lin( float stops) {
+    return _powf(2., stops + _log2f(0.18f) );
+}
+
+// --- CORE SPLINE EVALUATOR ---
+__DEVICE__ float eval_ocio_bspline(float x, __CONSTANTREF__ float* knots, int k_cnt, __CONSTANTREF__ float* coefs, int c_cnt) {
+    int sets = c_cnt / 3;
+    float knStart = knots[0];
+    float knEnd = knots[k_cnt - 1];
+
+    if (x <= knStart) {
+        return (x - knStart) * coefs[sets] + coefs[sets * 2];
+    } else if (x >= knEnd) {
+        float t = knEnd - knots[k_cnt - 2];
+        float slope = 2.0f * coefs[sets - 1] * t + coefs[sets * 2 - 1];
+        float offs = (coefs[sets - 1] * t + coefs[sets * 2 - 1]) * t + coefs[sets * 3 - 1];
+        return (x - knEnd) * slope + offs;
+    }
+
+    int i = 0;
+    for (i = 0; i < k_cnt - 2; ++i) {
+        if (x < knots[i + 1]) break;
+    }
+    float t = x - knots[i];
+    return (coefs[i] * t + coefs[sets + i]) * t + coefs[sets * 2 + i];
+}
+
+// --- LINEAR LUT INTERPOLATOR ---
+__DEVICE__ float interpolate1D(__CONSTANTREF__ float2* p_Table, int p_Size, float p_Val) {
+    if (p_Val < p_Table[0].x) return p_Table[0].y;
+    if (p_Val >= p_Table[p_Size - 1].x) return p_Table[p_Size - 1].y;
+
+    for (int i = 0; i < p_Size - 1; ++i) {
+        if (p_Val >= p_Table[i].x && p_Val < p_Table[i + 1].x) {
+            float t = (p_Val - p_Table[i].x) / (p_Table[i + 1].x - p_Table[i].x);
+            return (1.0f - t) * p_Table[i].y + t * p_Table[i + 1].y;
+        }
+    }
+    return 0.0f;
+}
+
+// --- COLORSPACE: RGB TO JMh ---
+__DEVICE__ float3 RGB_to_JMh(float3 rgb) {
+    // LMS Transform
+    float L = 0.445181072f * rgb.x + 0.34964928f * rgb.y - 0.00112973817f * rgb.z;
+    float M = 0.123734139f * rgb.x + 0.613643706f * rgb.y + 0.0563227981f * rgb.z;
+    float S = 0.0117006991f * rgb.x + 0.0280607957f * rgb.y + 0.753939092f * rgb.z;
+
+    // Non-linear compression
+    float L_p = _powf(_fabs(L), 0.42f) * _copysignf(1.0f, L);
+    float M_p = _powf(_fabs(M), 0.42f) * _copysignf(1.0f, M);
+    float S_p = _powf(_fabs(S), 0.42f) * _copysignf(1.0f, S);
+
+    float L_a = L_p / (27.13f + _fabs(L_p));
+    float M_a = M_p / (27.13f + _fabs(M_p));
+    float S_a = S_p / (27.13f + _fabs(S_p));
+
+    // To Aab
+    float A = 20.25881f * L_a + 10.129405f * M_a + 0.506470263f * S_a;
+    float a = 15480.0f * L_a - 16887.2734f * M_a + 1407.27271f * S_a;
+    float b = 1720.0f * L_a + 1720.0f * M_a - 3440.0f * S_a;
+
+    // To JMh
+    float J = 0.0f;
+    float JMh_M = 0.0f;
+    float h = 0.0f;
+
+    if (A > 0.0f) {
+        J = 100.0f * _powf(A, 1.13705599f);
+        JMh_M = _sqrtf(a * a + b * b);
+        h = (a == 0.0f) ? 0.0f : _atan2f(b, a) * 57.2957795f;
+        if (h < 0.0f) h += 360.0f;
+    }
+
+    return make_float3(J, JMh_M, h);
+}
+
+// --- COLORSPACE: JMh TO RGB ---
+__DEVICE__ float3 JMh_to_RGB(float3 JMh) {
+    float J = JMh.x;
+    float M = JMh.y;
+    float h = JMh.z;
+
+    float h_rad = h * 0.0174532924f;
+    float cos_h = _cosf(h_rad);
+    float sin_h = _sinf(h_rad);
+
+    // To Aab
+    float A = _powf(J * 0.01f, 0.879464149f);
+    float a = M * cos_h;
+    float b = M * sin_h;
+
+    // To compressed LMS
+    float L_a = 0.0323680267f * A + 2.07657631e-05f * a + 1.3260621e-05f * b;
+    float M_a = 0.0323680267f * A - 4.10250432e-05f * a - 1.20174373e-05f * b;
+    float S_a = 0.0323680267f * A - 1.01296409e-05f * a - 0.000290076074f * b;
+
+    L_a = _clampf(L_a, -0.99f, 0.99f);
+    M_a = _clampf(M_a, -0.99f, 0.99f);
+    S_a = _clampf(S_a, -0.99f, 0.99f);
+
+    float L_p = _copysignf(1.0f, L_a) * _powf(_fabs(27.13f * L_a / (1.0f - _fabs(L_a))), 2.38095236f);
+    float M_p = _copysignf(1.0f, M_a) * _powf(_fabs(27.13f * M_a / (1.0f - _fabs(M_a))), 2.38095236f);
+    float S_p = _copysignf(1.0f, S_a) * _powf(_fabs(27.13f * S_a / (1.0f - _fabs(S_a))), 2.38095236f);
+
+    // Inverse Matrix to RGB
+    float R = 2.66705418f * L_p - 1.52505863f * M_p + 0.117925495f * S_p;
+    float G = -0.535811901f * L_p + 1.94158077f * M_p - 0.14584811f * S_p;
+    float B = -0.0214488022f * L_p - 0.048595503f * M_p + 1.32996523f * S_p;
+
+    return make_float3(R, G, B);
+}
+
+// --- MAIN TRANSFORM ---
+__DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p_R, float p_G, float p_B) {
+    float3 rgb = make_float3(p_R, p_G, p_B);
+
+    float3 out_rgb = rgb;
+
+    if (lmt_option == AP1_CURVE) {
+        float3 rgb_working = rgb;
+
+        // Matrix to AP1
+        rgb_working.x =  1.45143932f * rgb.x + -0.23651075f * rgb.y + -0.21492857f * rgb.z;
+        rgb_working.y = -0.07655377f * rgb.x +  1.17622970f * rgb.y + -0.09967593f * rgb.z;
+        rgb_working.z =  0.00831615f * rgb.x + -0.00603245f * rgb.y +  0.99771630f * rgb.z;
+
+        // Convert to log (stop) space to apply curves
+        rgb_working.x = lin_to_stops( rgb_working.x);
+        rgb_working.y = lin_to_stops( rgb_working.y);
+        rgb_working.z = lin_to_stops( rgb_working.z);
+
+        // Apply curve
+        rgb_working.x = eval_ocio_bspline(rgb_working.x, c_knots, 10, c_coefs, 27);
+        rgb_working.y = eval_ocio_bspline(rgb_working.y, c_knots, 10, c_coefs, 27);
+        rgb_working.z = eval_ocio_bspline(rgb_working.z, c_knots, 10, c_coefs, 27);
+
+        // Convert back to linear
+        rgb_working.x = stops_to_lin( rgb_working.x);
+        rgb_working.y = stops_to_lin( rgb_working.y);
+        rgb_working.z = stops_to_lin( rgb_working.z);
+
+        out_rgb.x =  0.69545224f * rgb_working.x +  0.14067870f * rgb_working.y +  0.16386906f * rgb_working.z;
+        out_rgb.y =  0.04479456f * rgb_working.x +  0.85967112f * rgb_working.y +  0.09553432f * rgb_working.z;
+        out_rgb.z = -0.00552588f * rgb_working.x +  0.00402521f * rgb_working.y +  1.00150067f * rgb_working.z;
+
+    } else {
+        // Convert ACES to JMh
+        float3 JMh = RGB_to_JMh(rgb);
+        float J = JMh.x / 400.0f;
+        float M = JMh.y;
+        float h = JMh.z;
+
+        // Adjust J (lightness)
+        J = eval_ocio_bspline(J, j_knots, 18, j_coefs, 51);
+
+        // Adjust M (colorfulness)
+        float gain = 1.0f;
+        if (lmt_option == JM_GAIN) {
+            gain = const_gain;
+        } else if (lmt_option == JM_CURVE) {
+            gain = _fmaxf(0.0f, eval_ocio_bspline(J, m_knots, 9, m_coefs, 24));
+        }
+
+        M *= gain;
+
+        // Back to RGB
+        out_rgb = JMh_to_RGB(make_float3(J * 400.0f, M, h));
+    }
+
+    return out_rgb;
+}
