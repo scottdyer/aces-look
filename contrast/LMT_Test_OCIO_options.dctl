@@ -1,5 +1,5 @@
 // --- UI CONSTANTS ---
-DEFINE_UI_PARAMS(lmt_option, LMT type, DCTLUI_COMBO_BOX, 0, {AP1_CURVE, J_CURVE, JM_GAIN, JM_CURVE}, {AP1 Curve, J curve, J curve + M gain, J curve + M curve})
+DEFINE_UI_PARAMS(lmt_option, LMT type, DCTLUI_COMBO_BOX, 4, {AP1_CURVE, J_CURVE, JM_GAIN, JM_CURVE, J2M2_CURVE}, {AP1 Curve, J curve, J curve + M gain, J curve + M curve, J curve 2 + M curve 2});
 
 
 // --- DATA TABLES ---
@@ -14,6 +14,15 @@ __CONSTANT__ float j_coefs[51] = {0.0f, -2.63160825f, 7.89482498f, 53.0212593f, 
 // For M curve
 __CONSTANT__ float m_knots[9] = {0.0f, 0.0500000007f, 0.0783967525f, 0.150000006f, 0.369947463f, 0.550000012f, 0.682201087f, 0.75f, 1.0f};
 __CONSTANT__ float m_coefs[24] = {0.0f, 20.369606f, 1.31447661f, 2.49535179f, -3.7139051f, -0.968503118f, -6.26355982f, 0.0f, 0.0f, 0.0f, 1.15686131f, 1.34510291f, 2.44279552f, 1.10539937f, 0.849325061f, 0.0f, 1.0f, 1.0f, 1.01642561f, 1.10599995f, 1.52256918f, 1.84200001f, 1.97120833f, 2.0f};
+
+// For J2 / M2 curve
+__CONSTANT__ float j2_knots[15] = { 0.0f, 0.0330908746f, 0.0634082332f, 0.0868174285f, 0.1123465f, 0.141559377f, 0.168578103f, 0.212038472f, 0.252095997f, 0.328614175f, 0.405946195f, 0.496465236f, 0.554657578f, 0.711169541f, 0.875658214f };
+
+__CONSTANT__ float j2_coefs[42] = { 0.583150923f, 2.73948884f, 4.06192493f, 0.650720537f, 0.231780261f, 3.648947f, 0.510046005f, 3.10289025f, 0.716681123f, 0.354450703f, -1.21799815f, 9.68025112f, 1.06305385f, 0.220671952f, 0.982156217f, 1.02075016f, 1.1868583f, 1.37703109f, 1.41025567f, 1.42379761f, 1.6209774f, 1.66531098f, 1.91389918f, 2.02357745f, 2.07839823f, 1.85789418f, 2.98452711f, 3.3172884f, 0.0f, 0.0331389606f, 0.0666033924f, 0.0966126919f, 0.132191107f, 0.173586532f, 0.214719504f, 0.286131173f, 0.357818305f, 0.508462548f, 0.667069614f, 0.845224321f, 0.986120224f, 1.47927499f };
+
+__CONSTANT__ float m2_knots[10] = { 0.0f, 0.0251623373f, 0.0500000007f, 0.100000009f, 0.150000006f, 0.285999984f, 0.319999993f, 0.558181763f, 0.75f, 1.0f };
+
+__CONSTANT__ float m2_coefs[27] = { 0.602912724f, 2.98396826f, 2.38094521f, -1.90475237f, 0.905670822f, -33.2700272f, -0.5602054f, -1.00038815f, 0.0f, 2.44047642f, 2.4708178f, 2.6190474f, 2.85714197f, 2.66666675f, 2.91300917f, 0.650646806f, 0.383785367f, 0.0f, 1.0f, 1.06178975f, 1.125f, 1.26190472f, 1.39999998f, 1.77941787f, 1.84000003f, 1.96319151f, 2.0f };
 
 __CONSTANT__ float const_gain = 1.22f;
 
@@ -177,22 +186,30 @@ __DEVICE__ float3 transform(int p_Width, int p_Height, int p_X, int p_Y, float p
         float M = JMh.y;
         float h = JMh.z;
 
-        // Adjust J (lightness)
-        J = eval_ocio_bspline(J, j_knots, 18, j_coefs, 51);
+        float J_modified = J;
+        float M_modified = M;
 
-        // Adjust M (colorfulness)
-        float gain = 1.0f;
         if (lmt_option == JM_GAIN) {
-            gain = const_gain;
+
+            J_modified = eval_ocio_bspline(J, j_knots, 18, j_coefs, 51);
+            M_modified = M * const_gain;
+
         } else if (lmt_option == JM_CURVE) {
-            gain = _fmaxf(0.0f, eval_ocio_bspline(J, m_knots, 9, m_coefs, 24));
+
+            J_modified = eval_ocio_bspline(J, j_knots, 18, j_coefs, 51);
+            M_modified = M * _fmaxf(0.0f, eval_ocio_bspline(J_modified, m_knots, 9, m_coefs, 24));
+
+        } else if (lmt_option == J2M2_CURVE) {
+
+            J_modified = eval_ocio_bspline(J, j2_knots, 15, j2_coefs, 42);
+            M_modified = M * _fmaxf(0.0f, eval_ocio_bspline(J, m2_knots, 10, m2_coefs, 27));            
+            
         }
 
-        M *= gain;
-
         // Back to RGB
-        out_rgb = JMh_to_RGB(make_float3(J * 400.0f, M, h));
+        out_rgb = JMh_to_RGB(make_float3(J_modified * 400.0f, M_modified, h));
     }
+
 
     return out_rgb;
 }
